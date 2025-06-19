@@ -5,37 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Platform Berbagi Layar Otomatis</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Pustaka untuk komunikasi real-time -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .video-container {
-            background-color: #000;
-            border-radius: 0.75rem;
-            overflow: hidden;
-            aspect-ratio: 16 / 9;
-            width: 100%;
-        }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .status {
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            font-weight: 500;
-            text-align: center;
-            transition: background-color 0.3s;
-        }
-        .link-display {
-            background-color: #eef2ff;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            font-family: monospace;
-            word-break: break-all;
-            border: 1px dashed #c7d2fe;
-        }
+        .video-container { background-color: #000; border-radius: 0.75rem; overflow: hidden; aspect-ratio: 16 / 9; width: 100%; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        .status { padding: 0.75rem; border-radius: 0.375rem; font-weight: 500; text-align: center; transition: background-color 0.3s; }
+        .link-display { background-color: #eef2ff; padding: 0.75rem 1rem; border-radius: 0.5rem; font-family: monospace; word-break: break-all; border: 1px dashed #c7d2fe; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,16 +21,11 @@
 
     <div class="w-full max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-lg">
         
-        <!-- Tampilan untuk Presenter -->
         <div id="presenter-view" class="hidden">
-            <header class="text-center mb-6">
-                <h1 class="text-3xl font-bold text-blue-600">Anda adalah Presenter</h1>
-            </header>
-            <div class="video-container mb-4">
-                <video id="localVideo" autoplay muted playsinline></video>
-            </div>
+            <header class="text-center mb-6"><h1 class="text-3xl font-bold text-blue-600">Anda adalah Presenter</h1></header>
+            <div class="video-container mb-4"><video id="localVideo" autoplay muted playsinline></video></div>
             <div id="presenterStatus" class="status bg-gray-200 text-gray-700 mb-4">Mulai presentasi untuk mendapatkan link penonton.</div>
-            <button id="startShareBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors">Mulai Presentasi</button>
+            <button id="startShareBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700">Mulai Presentasi</button>
             <div id="viewer-link-container" class="hidden mt-4">
                 <p class="font-medium text-center mb-2">Bagikan QR Code atau Link ini ke Penonton:</p>
                 <div class="link-display" id="viewerLink"></div>
@@ -62,17 +33,11 @@
             </div>
         </div>
 
-        <!-- Tampilan untuk Penonton -->
         <div id="viewer-view" class="hidden">
-            <header class="text-center mb-6">
-                <h1 class="text-3xl font-bold text-purple-600">Selamat Datang Penonton!</h1>
-            </header>
-            <div class="video-container">
-                <video id="remoteVideo" autoplay playsinline></video>
-            </div>
+            <header class="text-center mb-6"><h1 class="text-3xl font-bold text-purple-600">Selamat Datang Penonton!</h1></header>
+            <div class="video-container"><video id="remoteVideo" autoplay playsinline></video></div>
             <div id="viewerStatus" class="status bg-yellow-100 text-yellow-800 mt-4">Menunggu presenter memulai siaran...</div>
         </div>
-
     </div>
 
     <script>
@@ -88,8 +53,6 @@
         const viewerLink = document.getElementById('viewerLink');
         const viewerLinkContainer = document.getElementById('viewer-link-container');
 
-        let peerConnections = {};
-        let localStream;
         const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
         const urlParams = new URLSearchParams(window.location.search);
         const role = urlParams.get('role');
@@ -97,42 +60,22 @@
 
         function updateStatus(element, message, type) {
             element.textContent = message;
-            element.className = 'status text-white ';
-            if (type === 'success') element.classList.add('bg-green-500');
-            else if (type === 'error') element.classList.add('bg-red-500');
-            else if (type === 'info') element.classList.add('bg-blue-500');
-            else if (type === 'wait') element.classList.add('bg-yellow-100', 'text-yellow-800');
-        }
-
-        async function createPeerConnection(viewerId, presenterId) {
-            const peerConnection = new RTCPeerConnection(configuration);
-            peerConnections[viewerId] = peerConnection;
-
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    socket.emit('candidate', { to: viewerId, candidate: event.candidate });
-                }
+            element.className = 'status ';
+            const colors = {
+                success: 'bg-green-500 text-white',
+                error: 'bg-red-500 text-white',
+                info: 'bg-blue-500 text-white',
+                wait: 'bg-yellow-100 text-yellow-800'
             };
-            
-            // Untuk penonton, set track video
-            if(role !== 'presenter'){
-                peerConnection.ontrack = event => {
-                    remoteVideo.srcObject = event.streams[0];
-                    updateStatus(viewerStatus, 'Siaran diterima!', 'success');
-                };
-            }
-            
-            // Untuk presenter, tambahkan track dari stream lokal
-            if (localStream) {
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            }
-            
-            return peerConnection;
+            element.classList.add(...(colors[type] || 'bg-gray-200 text-gray-700').split(' '));
         }
 
         // --- Logika Presenter ---
         if (role === 'presenter') {
+            let peerConnections = {};
+            let localStream;
             presenter_view.classList.remove('hidden');
+
             startShareBtn.onclick = async () => {
                 try {
                     localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
@@ -144,87 +87,95 @@
                     viewerLink.textContent = viewerUrl;
                     viewerLinkContainer.classList.remove('hidden');
 
-                    socket.emit('presenter-join');
-
-                } catch (err) {
-                    updateStatus(presenterStatus, 'Gagal memulai. Pastikan izin diberikan.', 'error');
-                }
+                    socket.emit('presenter-is-live');
+                } catch (err) { updateStatus(presenterStatus, 'Gagal memulai. Pastikan izin diberikan.', 'error'); }
             };
 
-            socket.on('new-viewer-wants-to-connect', async ({ viewerId }) => {
-                updateStatus(presenterStatus, `Penonton [${viewerId.substring(0,4)}] terdeteksi. Membuat koneksi...`, 'info');
-                const peerConnection = await createPeerConnection(viewerId);
+            socket.on('new-viewer-request', async ({ viewerId }) => {
+                if (!localStream) return; // Jangan lakukan apa-apa jika stream belum siap
+
+                updateStatus(presenterStatus, `Penonton [${viewerId.substring(0,4)}] terdeteksi. Membuat penawaran...`, 'info');
+                
+                const peerConnection = new RTCPeerConnection(configuration);
+                peerConnections[viewerId] = peerConnection;
+
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('ice-candidate', { to: viewerId, candidate: event.candidate });
+                    }
+                };
+
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-
                 socket.emit('offer', { to: viewerId, offer });
             });
 
-            socket.on('answer', ({ from: viewerId, answer }) => {
-                const peerConnection = peerConnections[viewerId];
-                if (peerConnection) {
-                    peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                    updateStatus(presenterStatus, `Koneksi dengan [${viewerId.substring(0,4)}] berhasil dibuat!`, 'success');
+            socket.on('answer', ({ from, answer }) => {
+                const pc = peerConnections[from];
+                if (pc) {
+                    pc.setRemoteDescription(new RTCSessionDescription(answer));
                 }
             });
 
-            socket.on('candidate', ({ from: viewerId, candidate }) => {
-                 const peerConnection = peerConnections[viewerId];
-                if (peerConnection) {
-                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e));
-                }
+            socket.on('ice-candidate', ({ from, candidate }) => {
+                const pc = peerConnections[from];
+                if (pc) { pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e)); }
             });
         }
         
         // --- Logika Penonton ---
         if (role !== 'presenter') {
             viewer_view.classList.remove('hidden');
-            let peerConnection; // penonton hanya punya satu koneksi ke presenter
-
-            const connectToPresenter = (presenterId) => {
-                 if (peerConnection) return; // Mencegah koneksi ganda
-                 updateStatus(viewerStatus, 'Presenter ditemukan! Meminta untuk bergabung...', 'info');
-                 socket.emit('viewer-join');
-            }
-
-            // Saat penonton pertama kali masuk, coba bergabung
-            socket.emit('viewer-join');
-
-            // Jika ada presenter yang baru live, coba bergabung lagi
-            socket.on('presenter-is-live', ({ presenterId }) => {
-                 connectToPresenter(presenterId);
+            let peerConnection; 
+            let presenterId = null;
+            
+            socket.on('presenter-has-joined', (data) => {
+                if (!peerConnection) { // Hanya jika belum terhubung
+                    presenterId = data.presenterId;
+                    updateStatus(viewerStatus, 'Presenter ditemukan! Meminta untuk bergabung...', 'info');
+                    socket.emit('viewer-wants-to-connect', { to: presenterId });
+                }
             });
 
-            socket.on('offer', async ({ from: presenterId, offer }) => {
+            socket.on('offer', async ({ from, offer }) => {
+                if (peerConnection) return;
+                
                 updateStatus(viewerStatus, 'Penawaran diterima. Membuat jawaban...', 'info');
-                peerConnection = await createPeerConnection(socket.id, presenterId); // ID kita dan ID presenter
+                peerConnection = new RTCPeerConnection(configuration);
+                
+                peerConnection.ontrack = event => {
+                    remoteVideo.srcObject = event.streams[0];
+                    updateStatus(viewerStatus, 'Siaran diterima!', 'success');
+                };
+                
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('ice-candidate', { to: from, candidate: event.candidate });
+                    }
+                };
+
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-                socket.emit('answer', { to: presenterId, answer });
+                socket.emit('answer', { to: from, answer });
             });
             
-            socket.on('candidate', ({ from: presenterId, candidate }) => {
-                if (peerConnection) {
-                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e));
-                }
+            socket.on('ice-candidate', ({ candidate }) => {
+                if (peerConnection) { peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e)); }
             });
 
-            socket.on('presenter-left', () => {
+            socket.on('presenter-has-left', () => {
                 updateStatus(viewerStatus, 'Presenter telah mengakhiri siaran.', 'wait');
-                if (peerConnection) {
-                    peerConnection.close();
-                    peerConnection = null;
-                }
+                if (peerConnection) { peerConnection.close(); peerConnection = null; }
                 remoteVideo.srcObject = null;
             });
         }
 
         function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            navigator.clipboard.writeText(element.textContent).then(() => {
-                alert('Link penonton berhasil disalin!');
-            });
+            navigator.clipboard.writeText(document.getElementById(elementId).textContent)
+                .then(() => alert('Link penonton berhasil disalin!'));
         }
     </script>
 </body>
